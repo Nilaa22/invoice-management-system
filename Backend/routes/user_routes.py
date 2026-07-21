@@ -17,6 +17,7 @@ def user():
             id SERIAL PRIMARY KEY,
             user_name VARCHAR(100),
             password VARCHAR(100) NOT NULL,
+            role VARCHAR(50),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
