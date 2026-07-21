@@ -32,15 +32,15 @@ app.register_blueprint(activity_bp)
 app.register_blueprint(analytics_bp)
 app.register_blueprint(utils_bp)
 app.register_blueprint(pdf_bp)
+customer()
+user()
+product()
+company()
+pi()
+ti()
+create_activity_table()
 
 if __name__ == "__main__":
     # db_connection()
-    customer()
-    user()
-    product()
-    company()
-    pi()
-    ti()
-    create_activity_table()
-    
+
     app.run(debug=True,host="0.0.0.0")
