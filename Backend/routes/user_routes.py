@@ -259,6 +259,7 @@ from datetime import timedelta
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import (
     create_access_token,
+    get_csrf_token,
     get_jwt,
     get_jwt_identity,
     jwt_required,
@@ -558,7 +559,9 @@ def login():
         response = jsonify({
             "message":
                 "Login successful",
-            "user": user_response
+            "user": user_response,
+            "csrf_token":
+                get_csrf_token(token)
         })
 
         set_access_cookies(
@@ -611,6 +614,8 @@ def logout():
 )
 @jwt_required()
 def get_current_user():
+    jwt_data = get_jwt()
+
     try:
         user_id = int(
             get_jwt_identity()
@@ -654,7 +659,9 @@ def get_current_user():
 
         return jsonify({
             "user":
-                safe_user_object(found_user)
+                safe_user_object(found_user),
+            "csrf_token":
+                jwt_data.get("csrf")
         }), 200
 
     except Exception as error:
