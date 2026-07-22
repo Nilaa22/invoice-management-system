@@ -610,78 +610,78 @@ def get_single_pi(pi_id):
         conn.close()
         
 # UPDATE PI
-@pi_bp.route("/pi/<int:pi_id>", methods=["GET"])
-def update_pi_bill(pi_id):
-    conn = pg_connection()
+# @pi_bp.route("/pi/<int:pi_id>", methods=["GET"])
+# def update_pi_bill(pi_id):
+#     conn = pg_connection()
 
-    cur = conn.cursor(
-        cursor_factory=RealDictCursor
-    )
+#     cur = conn.cursor(
+#         cursor_factory=RealDictCursor
+#     )
 
-    try:
-        cur.execute("""
-            SELECT *
-            FROM pi_bills
-            WHERE pi_id = %s
-        """, (pi_id,))
+#     try:
+#         cur.execute("""
+#             SELECT *
+#             FROM pi_bills
+#             WHERE pi_id = %s
+#         """, (pi_id,))
 
-        pi_row = cur.fetchone()
+#         pi_row = cur.fetchone()
 
-        if not pi_row:
-            return jsonify({
-                "message": "PI not found"
-            }), 404
+#         if not pi_row:
+#             return jsonify({
+#                 "message": "PI not found"
+#             }), 404
 
-        pi = serialize_row(pi_row)
+#         pi = serialize_row(pi_row)
 
-        products = fetch_pi_items(
-            cur,
-            pi_id
-        )
+#         products = fetch_pi_items(
+#             cur,
+#             pi_id
+#         )
 
-        pi["products"] = products
-        pi["items"] = products
+#         pi["products"] = products
+#         pi["items"] = products
 
-        pi["customer"] = (
-            build_customer_object(pi)
-        )
+#         pi["customer"] = (
+#             build_customer_object(pi)
+#         )
 
-        # Compatibility fields used by your existing React code
-        pi["issue"] = (
-            pi.get("quotation_date") or ""
-        )
+#         # Compatibility fields used by your existing React code
+#         pi["issue"] = (
+#             pi.get("quotation_date") or ""
+#         )
 
-        pi["expiry"] = (
-            pi.get("expiry_date") or ""
-        )
+#         pi["expiry"] = (
+#             pi.get("expiry_date") or ""
+#         )
 
-        pi["untaxed"] = float(
-            pi.get("untaxed_amount") or 0
-        )
+#         pi["untaxed"] = float(
+#             pi.get("untaxed_amount") or 0
+#         )
 
-        pi["taxed"] = float(
-            pi.get("gst_amount") or 0
-        )
+#         pi["taxed"] = float(
+#             pi.get("gst_amount") or 0
+#         )
 
-        pi["grandTotal"] = float(
-            pi.get("total_amount") or 0
-        )
+#         pi["grandTotal"] = float(
+#             pi.get("total_amount") or 0
+#         )
 
-        pi["converted_to_ti"] = bool(
-            pi.get("converted_to_ti", False)
-        )
+#         pi["converted_to_ti"] = bool(
+#             pi.get("converted_to_ti", False)
+#         )
 
-        return jsonify(pi), 200
+#         return jsonify(pi), 200
 
-    except Exception as error:
-        return jsonify({
-            "message": "Error fetching PI details",
-            "error": str(error)
-        }), 500
+#     except Exception as error:
+#         return jsonify({
+#             "message": "Error fetching PI details",
+#             "error": str(error)
+#         }), 500
 
-    finally:
-        cur.close()
-        conn.close()
+#     finally:
+#         cur.close()
+#         conn.close()
         
         # put pi_bill
 @pi_bp.route(
@@ -907,27 +907,17 @@ def update_pi(pi_id):
 
         # Keep this activity insert only if these
         # columns match your current activity_logs table.
-        if actor_user_id or actor_user_name:
-            cur.execute(
-                """
-                INSERT INTO activity_logs (
-                    user_id,
-                    user_name,
-                    activity_type,
-                    description
-                )
-                VALUES (%s, %s, %s, %s)
-                """,
-                (
-                    actor_user_id,
-                    actor_user_name,
-                    "pi",
-                    (
-                        f"Updated Proforma Invoice "
-                        f"{pi_number or existing_pi[1]}"
-                    )
-                )
-            )
+        add_activity(
+    activity_type="pi",
+    action="updated",
+    title="Proforma Invoice updated",
+    description=f"{pi_number or existing_pi[1]} has been updated",
+    reference_id=pi_id,
+    reference_number=pi_number or existing_pi[1],
+    user_id=actor_user_id,
+    user_name=actor_user_name,
+    conn=conn
+)
 
         conn.commit()
 
