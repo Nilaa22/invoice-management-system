@@ -49,11 +49,20 @@ def generate_invoice_pdf():
 
     try:
         with sync_playwright() as playwright:
-            browser = (
-                playwright.chromium.launch(
-                    headless=True
-                )
-            )
+            # browser = (
+            #     playwright.chromium.launch(
+            #         headless=True
+            #     )
+            # )
+            browser = playwright.chromium.launch(
+    channel="chromium",
+    headless=True,
+    args=[
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+    ],
+)
 
             page = browser.new_page()
 
