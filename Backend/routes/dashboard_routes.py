@@ -85,7 +85,7 @@ def get_admin_dashboard():
                 created_at
             FROM activity_logs
             ORDER BY created_at DESC, activity_id DESC
-            LIMIT 10
+           
         """)
 
         activity_rows = cur.fetchall()
@@ -249,7 +249,7 @@ def get_user_dashboard(user_id):
             ORDER BY
                 created_at DESC,
                 activity_id DESC
-            LIMIT 10
+        
         """, (user_id,))
 
         activity_rows = cur.fetchall()
