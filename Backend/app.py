@@ -33,15 +33,13 @@ app.register_blueprint(analytics_bp)
 app.register_blueprint(utils_bp)
 app.register_blueprint(pdf_bp)
 
-
+# Initialize database tables when the module is imported
+customer()
+user()
+product()
+company()
+pi()
+ti()
+create_activity_table()
 if __name__ == "__main__":
-        customer()
-        user()
-        product()
-        company()
-        pi()
-        ti()
-        create_activity_table()
-    # db_connection()
-
-app.run(debug=True,host="0.0.0.0")
+    app.run(debug=True,host="0.0.0.0",port=5000)
