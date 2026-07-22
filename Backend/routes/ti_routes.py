@@ -833,25 +833,171 @@ def get_tax_invoices():
         conn.close()
         
                 
-@ti_bp.route("/ti/<int:ti_id>", methods=["GET"])
+# @ti_bp.route("/ti/<int:ti_id>", methods=["GET"])
+# def get_single_ti(ti_id):
+#     conn = pg_connection()
+#     cur = conn.cursor()
+
+#     try:
+#         cur.execute("""
+#             SELECT *
+#             FROM ti_bills
+#             WHERE ti_id = %s
+#         """, (ti_id,))
+
+#         bill = cur.fetchone()
+
+#         if bill is None:
+#             return jsonify({"message": "Tax Invoice not found"}), 404
+
+#         cur.execute("""
+#             SELECT
+#                 product_id,
+#                 product_name,
+#                 description,
+#                 hsn_sac_code,
+#                 quantity,
+#                 unit_price,
+#                 tax,
+#                 tax_type,
+#                 discount,
+#                 total
+#             FROM ti_items
+#             WHERE ti_id = %s
+#             ORDER BY item_id
+#         """, (ti_id,))
+
+#         items = cur.fetchall()
+
+#         return jsonify({
+#             "ti_id": bill[0],
+#             "ti_number": bill[1],
+#             "customer": {
+#                 "id": bill[2],
+#                 "customer_name": bill[3],
+#                 "company_name": bill[4],
+#                 "gst_number": bill[5],
+#                 "phone_number": bill[6],
+#                 "email_address": bill[7],
+#                 "street_address": bill[8],
+#                 "city": bill[9],
+#                 "state": bill[10],
+#                 "country": bill[11],
+#                 "pincode_zip": bill[12],
+#                 "shipping_street_address": bill[13],
+#                 "shipping_city": bill[14],
+#                 "shipping_state": bill[15],
+#                 "shipping_country": bill[16],
+#                 "shipping_pincode_zip": bill[17]
+#             },
+#             "issueDate": bill[18].strftime("%Y-%m-%d") if bill[18] else "",
+#             # "expiryDate": bill[19].strftime("%Y-%m-%d") if bill[19] else "",
+#             "untaxed": float(bill[20] or 0),
+#             "taxed": float(bill[21] or 0),
+#             "grandTotal": float(bill[22] or 0),
+#             "terms": bill[23],
+#             "payment_terms": bill[24],
+#             "amount_in_words":bill[30],
+#             "products": [
+#                 {
+#                     "product_id": item[0],
+#                     "product_name": item[1],
+#                     "description": item[2],
+#                     "hsn_sac_code": item[3],
+#                     "quantity": float(item[4] or 0),
+#                     "unit_price": float(item[5] or 0),
+#                     "tax": float(item[6] or 0),
+#                     "tax_type": item[7],
+#                     "discount": float(item[8] or 0),
+#                     "total": float(item[9] or 0)
+#                 }
+#                 for item in items
+#             ]
+#         }), 200
+
+#     except Exception as e:
+#         return jsonify({
+#             "message": "Error fetching tax invoice",
+#             "error": str(e)
+#         }), 500
+
+#     finally:
+#         cur.close()
+#         conn.close()
+
+@ti_bp.route(
+    "/ti/<int:ti_id>",
+    methods=["GET"]
+)
 def get_single_ti(ti_id):
     conn = pg_connection()
-    cur = conn.cursor()
+
+    cur = conn.cursor(
+        cursor_factory=RealDictCursor
+    )
 
     try:
+        # Never use SELECT * here.
+        # The database schema has changed over time,
+        # so explicit column names prevent index errors.
         cur.execute("""
-            SELECT *
+            SELECT
+                ti_id,
+                ti_number,
+
+                customer_id,
+                customer_name,
+                company_name,
+                gst_number,
+                phone_number,
+                email_address,
+
+                street_address,
+                city,
+                state,
+                country,
+                pincode_zip,
+
+                shipping_street_address,
+                shipping_city,
+                shipping_state,
+                shipping_country,
+                shipping_pincode_zip,
+
+                quotation_date,
+
+                untaxed_amount,
+                gst_amount,
+                total_amount,
+
+                terms,
+                payment_terms,
+                amount_in_words,
+
+                balance_amount,
+                status,
+
+                pi_id,
+                pi_number
+
             FROM ti_bills
+
             WHERE ti_id = %s
-        """, (ti_id,))
+        """, (
+            ti_id,
+        ))
 
         bill = cur.fetchone()
 
-        if bill is None:
-            return jsonify({"message": "Tax Invoice not found"}), 404
+        if not bill:
+            return jsonify({
+                "message":
+                    "Tax Invoice not found"
+            }), 404
 
         cur.execute("""
             SELECT
+                item_id,
                 product_id,
                 product_name,
                 description,
@@ -862,63 +1008,234 @@ def get_single_ti(ti_id):
                 tax_type,
                 discount,
                 total
-            FROM ti_items
-            WHERE ti_id = %s
-            ORDER BY item_id
-        """, (ti_id,))
 
-        items = cur.fetchall()
+            FROM ti_items
+
+            WHERE ti_id = %s
+
+            ORDER BY item_id
+        """, (
+            ti_id,
+        ))
+
+        item_rows = cur.fetchall()
+
+        products = []
+
+        for item in item_rows:
+            products.append({
+                "item_id":
+                    item["item_id"],
+
+                "product_id":
+                    item["product_id"],
+
+                "product_name":
+                    item["product_name"]
+                    or "",
+
+                "description":
+                    item["description"]
+                    or "",
+
+                "hsn_sac_code":
+                    item["hsn_sac_code"]
+                    or "",
+
+                "quantity":
+                    float(
+                        item["quantity"]
+                        or 0
+                    ),
+
+                "unit_price":
+                    float(
+                        item["unit_price"]
+                        or 0
+                    ),
+
+                "tax":
+                    float(
+                        item["tax"]
+                        or 0
+                    ),
+
+                "tax_type":
+                    item["tax_type"]
+                    or "",
+
+                "discount":
+                    float(
+                        item["discount"]
+                        or 0
+                    ),
+
+                "total":
+                    float(
+                        item["total"]
+                        or 0
+                    )
+            })
 
         return jsonify({
-            "ti_id": bill[0],
-            "ti_number": bill[1],
+            "ti_id":
+                bill["ti_id"],
+
+            "ti_number":
+                bill["ti_number"]
+                or "",
+
             "customer": {
-                "id": bill[2],
-                "customer_name": bill[3],
-                "company_name": bill[4],
-                "gst_number": bill[5],
-                "phone_number": bill[6],
-                "email_address": bill[7],
-                "street_address": bill[8],
-                "city": bill[9],
-                "state": bill[10],
-                "country": bill[11],
-                "pincode_zip": bill[12],
-                "shipping_street_address": bill[13],
-                "shipping_city": bill[14],
-                "shipping_state": bill[15],
-                "shipping_country": bill[16],
-                "shipping_pincode_zip": bill[17]
+                "id":
+                    bill["customer_id"],
+
+                "customer_id":
+                    bill["customer_id"],
+
+                "customer_name":
+                    bill["customer_name"]
+                    or "",
+
+                "company_name":
+                    bill["company_name"]
+                    or "",
+
+                "gst_number":
+                    bill["gst_number"]
+                    or "",
+
+                "phone_number":
+                    bill["phone_number"]
+                    or "",
+
+                "email_address":
+                    bill["email_address"]
+                    or "",
+
+                "street_address":
+                    bill["street_address"]
+                    or "",
+
+                "city":
+                    bill["city"]
+                    or "",
+
+                "state":
+                    bill["state"]
+                    or "",
+
+                "country":
+                    bill["country"]
+                    or "",
+
+                "pincode_zip":
+                    bill["pincode_zip"]
+                    or "",
+
+                "shipping_street_address":
+                    bill[
+                        "shipping_street_address"
+                    ] or "",
+
+                "shipping_city":
+                    bill["shipping_city"]
+                    or "",
+
+                "shipping_state":
+                    bill["shipping_state"]
+                    or "",
+
+                "shipping_country":
+                    bill["shipping_country"]
+                    or "",
+
+                "shipping_pincode_zip":
+                    bill[
+                        "shipping_pincode_zip"
+                    ] or ""
             },
-            "issueDate": bill[18].strftime("%Y-%m-%d") if bill[18] else "",
-            # "expiryDate": bill[19].strftime("%Y-%m-%d") if bill[19] else "",
-            "untaxed": float(bill[20] or 0),
-            "taxed": float(bill[21] or 0),
-            "grandTotal": float(bill[22] or 0),
-            "terms": bill[23],
-            "payment_terms": bill[24],
-            "amount_in_words":bill[30],
-            "products": [
-                {
-                    "product_id": item[0],
-                    "product_name": item[1],
-                    "description": item[2],
-                    "hsn_sac_code": item[3],
-                    "quantity": float(item[4] or 0),
-                    "unit_price": float(item[5] or 0),
-                    "tax": float(item[6] or 0),
-                    "tax_type": item[7],
-                    "discount": float(item[8] or 0),
-                    "total": float(item[9] or 0)
-                }
-                for item in items
-            ]
+
+            "issueDate": (
+                bill["quotation_date"].strftime(
+                    "%Y-%m-%d"
+                )
+                if bill["quotation_date"]
+                else ""
+            ),
+
+            "untaxed":
+                float(
+                    bill["untaxed_amount"]
+                    or 0
+                ),
+
+            "taxed":
+                float(
+                    bill["gst_amount"]
+                    or 0
+                ),
+
+            "grandTotal":
+                float(
+                    bill["total_amount"]
+                    or 0
+                ),
+
+            "terms":
+                bill["terms"]
+                or "",
+
+            "payment_terms":
+                bill["payment_terms"]
+                or "",
+
+            "amount_in_words":
+                bill["amount_in_words"]
+                or "",
+
+            "balance_amount":
+                float(
+                    bill["balance_amount"]
+                    if bill["balance_amount"]
+                    is not None
+                    else bill["total_amount"]
+                    or 0
+                ),
+
+            "status":
+                bill["status"]
+                or "Unpaid",
+
+            "source_pi_id":
+                bill["pi_id"],
+
+            "source_pi_number":
+                bill["pi_number"]
+                or "",
+
+            "pi_id":
+                bill["pi_id"],
+
+            "pi_number":
+                bill["pi_number"]
+                or "",
+
+            "conversionMode":
+                bool(
+                    bill["pi_id"]
+                ),
+
+            "products":
+                products
         }), 200
 
-    except Exception as e:
+    except Exception as error:
         return jsonify({
-            "message": "Error fetching tax invoice",
-            "error": str(e)
+            "message":
+                "Error fetching tax invoice",
+
+            "error":
+                str(error)
         }), 500
 
     finally:
