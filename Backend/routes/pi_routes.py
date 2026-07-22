@@ -611,7 +611,7 @@ def get_single_pi(pi_id):
         
 # UPDATE PI
 @pi_bp.route("/pi/<int:pi_id>", methods=["GET"])
-def update_pi(pi_id):
+def update_pi_bill(pi_id):
     conn = pg_connection()
 
     cur = conn.cursor(
@@ -676,6 +676,275 @@ def update_pi(pi_id):
     except Exception as error:
         return jsonify({
             "message": "Error fetching PI details",
+            "error": str(error)
+        }), 500
+
+    finally:
+        cur.close()
+        conn.close()
+        
+        # put pi_bill
+@pi_bp.route(
+    "/pi/<int:pi_id>",
+    methods=["PUT"]
+)
+def update_pi(pi_id):
+    conn = pg_connection()
+    cur = conn.cursor()
+
+    try:
+        data = request.get_json(
+            silent=True
+        ) or {}
+
+        customer_id = data.get(
+            "customer_id"
+        )
+
+        customer = (
+            data.get("customer") or {}
+        )
+
+        quotation_date = data.get(
+            "quotation_date"
+        )
+
+        expiry_date = data.get(
+            "expiry_date"
+        )
+
+        untaxed_amount = data.get(
+            "untaxed_amount",
+            0
+        )
+
+        gst_amount = data.get(
+            "gst_amount",
+            0
+        )
+
+        total_amount = data.get(
+            "total_amount",
+            0
+        )
+
+        items = data.get("items") or []
+
+        payment_terms = data.get(
+            "payment_terms",
+            ""
+        )
+
+        terms = data.get(
+            "terms",
+            ""
+        )
+
+        pi_number = data.get(
+            "pi_number"
+        )
+
+        amount_in_words = data.get(
+            "amount_in_words",
+            ""
+        )
+
+        actor_user_id = data.get(
+            "actor_user_id"
+        )
+
+        actor_user_name = data.get(
+            "actor_user_name"
+        )
+
+        if not customer_id:
+            return jsonify({
+                "message":
+                    "Customer is required"
+            }), 400
+
+        if not quotation_date:
+            return jsonify({
+                "message":
+                    "Quotation date is required"
+            }), 400
+
+        if not items:
+            return jsonify({
+                "message":
+                    "At least one product is required"
+            }), 400
+
+        # Lock the PI while updating it
+        cur.execute(
+            """
+            SELECT
+                pi_id,
+                pi_number,
+                converted_to_ti
+            FROM pi_bills
+            WHERE pi_id = %s
+            FOR UPDATE
+            """,
+            (pi_id,)
+        )
+
+        existing_pi = cur.fetchone()
+
+        if not existing_pi:
+            conn.rollback()
+
+            return jsonify({
+                "message": "PI not found"
+            }), 404
+
+        # Optional protection:
+        # prevent editing after conversion to TI
+        if existing_pi[2]:
+            conn.rollback()
+
+            return jsonify({
+                "message":
+                    "This PI has already been converted to a Tax Invoice and cannot be updated."
+            }), 409
+
+        cur.execute(
+            """
+            UPDATE pi_bills
+            SET
+                customer_id = %s,
+                quotation_date = %s,
+                expiry_date = %s,
+                untaxed_amount = %s,
+                gst_amount = %s,
+                total_amount = %s,
+                payment_terms = %s,
+                terms = %s,
+                pi_number = %s,
+                amount_in_words = %s
+            WHERE pi_id = %s
+            """,
+            (
+                customer_id,
+                quotation_date,
+                expiry_date,
+                untaxed_amount,
+                gst_amount,
+                total_amount,
+                payment_terms,
+                terms,
+                pi_number,
+                amount_in_words,
+                pi_id
+            )
+        )
+
+      
+        cur.execute(
+            """
+            DELETE FROM pi_items
+            WHERE pi_id = %s
+            """,
+            (pi_id,)
+        )
+
+        for item in items:
+            cur.execute(
+                """
+                INSERT INTO pi_items (
+                    pi_id,
+                    product_id,
+                    product_name,
+                    description,
+                    quantity,
+                    unit_price,
+                    hsn_sac_code,
+                    tax,
+                    tax_type,
+                    discount,
+                    total
+                )
+                VALUES (
+                    %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s
+                )
+                """,
+                (
+                    pi_id,
+                    item.get("product_id"),
+                    item.get(
+                        "product_name",
+                        ""
+                    ),
+                    item.get(
+                        "description",
+                        ""
+                    ),
+                    item.get(
+                        "quantity",
+                        0
+                    ),
+                    item.get(
+                        "unit_price",
+                        0
+                    ),
+                    item.get(
+                        "hsn_sac_code",
+                        ""
+                    ),
+                    item.get("tax", 0),
+                    item.get(
+                        "tax_type",
+                        ""
+                    ),
+                    item.get(
+                        "discount",
+                        0
+                    ),
+                    item.get("total", 0)
+                )
+            )
+
+        # Keep this activity insert only if these
+        # columns match your current activity_logs table.
+        if actor_user_id or actor_user_name:
+            cur.execute(
+                """
+                INSERT INTO activity_logs (
+                    user_id,
+                    user_name,
+                    activity_type,
+                    description
+                )
+                VALUES (%s, %s, %s, %s)
+                """,
+                (
+                    actor_user_id,
+                    actor_user_name,
+                    "pi",
+                    (
+                        f"Updated Proforma Invoice "
+                        f"{pi_number or existing_pi[1]}"
+                    )
+                )
+            )
+
+        conn.commit()
+
+        return jsonify({
+            "message":
+                "Proforma Invoice updated successfully",
+            "pi_id": pi_id,
+            "pi_number":
+                pi_number or existing_pi[1]
+        }), 200
+
+    except Exception as error:
+        conn.rollback()
+
+        return jsonify({
+            "message":
+                "Error updating Proforma Invoice",
             "error": str(error)
         }), 500
 
