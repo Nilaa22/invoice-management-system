@@ -177,7 +177,7 @@ jwt = JWTManager(app)
 
 allowed_origins = [
     "http://localhost:5173",
-    "https://lovely-granita-8e223b.netlify.app"
+   "https://veverywhere-invoice.netlify.app",
 ]
 
 
