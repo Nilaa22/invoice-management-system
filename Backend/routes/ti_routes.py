@@ -113,6 +113,25 @@ CREATE TABLE IF NOT EXISTS ti_bills (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 """)
+    cur.execute("""
+                ALTER TABLE ti_bills
+               ADD COLUMN IF NOT EXISTS amount_in_words VARCHAR(500)""")
+    cur.execute(""" 
+                ALTER TABLE ti_bills
+                ADD CONSTRAINT fk_ti_pi
+                FOREIGN KEY (pi_id)
+                REFERENCES pi_bills(pi_id)
+                ON DELETE SET NULL""")
+    cur.execute(""" 
+               ALTER TABLE ti_bills
+               ADD COLUMN IF NOT EXISTS pi_id INTEGER """)
+    cur.execute("""
+                ALTER TABLE ti_bills
+                ADD COLUMN IF NOT EXISTS pi_number VARCHAR(150)""")
+    cur.execute(""" 
+               ALTER TABLE ti_bills
+                ADD COLUMN IF NOT EXISTS balance_amount NUMERIC(12,2),
+                ADD COLUMN IF NOT EXISTS status VARCHAR(30) DEFAULT 'Unpaid' """)
     
     cur.execute("""
         CREATE TABLE IF NOT EXISTS ti_items (
@@ -144,6 +163,8 @@ CREATE TABLE IF NOT EXISTS ti_bills (
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) """)
+    cur.execute(""" ALTER TABLE ti_payments
+    ADD COLUMN IF NOT EXISTS reference_id VARCHAR(150) """)
             
     conn.commit()
     cur.close()
@@ -833,97 +854,6 @@ def get_tax_invoices():
         conn.close()
         
                 
-# @ti_bp.route("/ti/<int:ti_id>", methods=["GET"])
-# def get_single_ti(ti_id):
-#     conn = pg_connection()
-#     cur = conn.cursor()
-
-#     try:
-#         cur.execute("""
-#             SELECT *
-#             FROM ti_bills
-#             WHERE ti_id = %s
-#         """, (ti_id,))
-
-#         bill = cur.fetchone()
-
-#         if bill is None:
-#             return jsonify({"message": "Tax Invoice not found"}), 404
-
-#         cur.execute("""
-#             SELECT
-#                 product_id,
-#                 product_name,
-#                 description,
-#                 hsn_sac_code,
-#                 quantity,
-#                 unit_price,
-#                 tax,
-#                 tax_type,
-#                 discount,
-#                 total
-#             FROM ti_items
-#             WHERE ti_id = %s
-#             ORDER BY item_id
-#         """, (ti_id,))
-
-#         items = cur.fetchall()
-
-#         return jsonify({
-#             "ti_id": bill[0],
-#             "ti_number": bill[1],
-#             "customer": {
-#                 "id": bill[2],
-#                 "customer_name": bill[3],
-#                 "company_name": bill[4],
-#                 "gst_number": bill[5],
-#                 "phone_number": bill[6],
-#                 "email_address": bill[7],
-#                 "street_address": bill[8],
-#                 "city": bill[9],
-#                 "state": bill[10],
-#                 "country": bill[11],
-#                 "pincode_zip": bill[12],
-#                 "shipping_street_address": bill[13],
-#                 "shipping_city": bill[14],
-#                 "shipping_state": bill[15],
-#                 "shipping_country": bill[16],
-#                 "shipping_pincode_zip": bill[17]
-#             },
-#             "issueDate": bill[18].strftime("%Y-%m-%d") if bill[18] else "",
-#             # "expiryDate": bill[19].strftime("%Y-%m-%d") if bill[19] else "",
-#             "untaxed": float(bill[20] or 0),
-#             "taxed": float(bill[21] or 0),
-#             "grandTotal": float(bill[22] or 0),
-#             "terms": bill[23],
-#             "payment_terms": bill[24],
-#             "amount_in_words":bill[30],
-#             "products": [
-#                 {
-#                     "product_id": item[0],
-#                     "product_name": item[1],
-#                     "description": item[2],
-#                     "hsn_sac_code": item[3],
-#                     "quantity": float(item[4] or 0),
-#                     "unit_price": float(item[5] or 0),
-#                     "tax": float(item[6] or 0),
-#                     "tax_type": item[7],
-#                     "discount": float(item[8] or 0),
-#                     "total": float(item[9] or 0)
-#                 }
-#                 for item in items
-#             ]
-#         }), 200
-
-#     except Exception as e:
-#         return jsonify({
-#             "message": "Error fetching tax invoice",
-#             "error": str(e)
-#         }), 500
-
-#     finally:
-#         cur.close()
-#         conn.close()
 
 @ti_bp.route(
     "/ti/<int:ti_id>",

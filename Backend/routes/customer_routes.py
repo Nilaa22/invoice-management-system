@@ -35,6 +35,10 @@ def customer():
             shipping_pincode_zip VARCHAR(20)
         )
     """)
+    cur.execute(""" 
+                ALTER TABLE customers
+                ADD COLUMN IF NOT EXISTS created_at
+                TIMESTAMP DEFAULT CURRENT_TIMESTAMP""")
 
     conn.commit()
     cur.close()
