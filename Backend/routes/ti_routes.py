@@ -116,12 +116,12 @@ CREATE TABLE IF NOT EXISTS ti_bills (
     cur.execute("""
                 ALTER TABLE ti_bills
                ADD COLUMN IF NOT EXISTS amount_in_words VARCHAR(500)""")
-    cur.execute(""" 
-                ALTER TABLE ti_bills
-                ADD CONSTRAINT IF NOT EXISTS fk_ti_pi
-                FOREIGN KEY (pi_id)
-                REFERENCES pi_bills(pi_id)
-                ON DELETE SET NULL""")
+    # cur.execute(""" 
+    #             ALTER TABLE ti_bills
+    #             ADD CONSTRAINT IF NOT EXISTS fk_ti_pi
+    #             FOREIGN KEY (pi_id)
+    #             REFERENCES pi_bills(pi_id)
+    #             ON DELETE SET NULL""")
     cur.execute(""" 
                ALTER TABLE ti_bills
                ADD COLUMN IF NOT EXISTS pi_id INTEGER """)
